@@ -66,7 +66,7 @@ void CFluidSolver::reset()
 	for (int i = 0; i < size; i++) {
 		density[i] = 0.;
 		density_source[i] = 0.;
-		velocity[i] = vec2(2.,3.);
+		velocity[i] = vec2(0.,0.);
 		divergence[i] = 0.;
 		pressure[i] = 0.;
 		velocity_source[i] = vec2(0.,0.);
@@ -89,7 +89,7 @@ CFluidSolver::~CFluidSolver(void)
 void CFluidSolver::update()
 {
 	updateDensity();
-	//updateVelocity();
+	updateVelocity();
 }
 
 void CFluidSolver::updateDensity()
@@ -108,7 +108,7 @@ void CFluidSolver::updateVelocity()
 	velocity_advection();
 	add(velocity,advected_velocity,velocity_source);
 
-	//projection(); 
+	projection(); 
 	clean_velocity_source();
 }
 
@@ -164,9 +164,9 @@ void CFluidSolver::clean_velocity_source()
 
 void CFluidSolver::density_advection()
 {
-	for (int i=0; i<size; i++)
-		density[i]=density_source[i];
-	return;
+//	for (int i=0; i<size; i++)
+//		density[i]=density_source[i];
+//	return;
 
 	//set boundary condition
 	for (int i=0; i< n; i++) {
@@ -204,8 +204,8 @@ void CFluidSolver::density_advection()
 
 void CFluidSolver::velocity_advection()
 {
-	for (int i = 1; i < n-1; i++)
-		for (int j=1; j < n-1; j++) {
-			advected_velocity[i+j*n] = velocity[i+j*n];
+	for (int i = 1; i < n - 1; i++)
+		for (int j = 1; j < n - 1; j++) {
+			advected_velocity[i + j * n] = velocity[i + j * n];
 		}
 }
