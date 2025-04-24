@@ -250,7 +250,6 @@ public:
 		CSparseMatrix::setDimensions(int nRows, int nCols)
 	{
 		// Clean up anyway. Safer, since life is a jungle.
-		Cleanup();
 		numRows = nRows;
 		numCols = nCols;
 		rowList = new CMatrixElement*[numRows];
