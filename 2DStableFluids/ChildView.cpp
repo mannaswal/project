@@ -181,6 +181,10 @@ void CChildView::OnPaint()
 	MemDC1.TextOutW(8,row,_T("G : Show/Hide Gridlines"));
 	row += 20;
 	MemDC1.TextOutW(8,row,_T("A : One more time step"));
+	row += 20;
+	MemDC1.TextOutW(8, row, _T("+/= : Increase Viscosity"));
+	row += 20;
+	MemDC1.TextOutW(8, row, _T("-/_ : Decrease Viscosity"));
 
 
 	dc.BitBlt(windowSize+1,0,TextWidth,TextHeight,&MemDC1,0,0,NOTSRCCOPY);

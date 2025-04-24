@@ -18,7 +18,7 @@ n(60), size(60*60), h(0.1), laplacian(size,size), diffusion(size,size), velocity
     temp_y = new double[size]; // Allocate temp array for y-velocity
 
 	double diffusion_coef = 0.3*h;
-    viscosity_coef = 0.1; // Default viscosity
+	viscosity_coef = 0.1; // Default viscosity
 
 	//Set up the Laplacian matrix and diffusion matrix
 	for (int i = 0; i < n; i++) {
@@ -75,6 +75,7 @@ void CFluidSolver::reset()
 		divergence[i] = 0.;
 		pressure[i] = 0.;
 		velocity_source[i] = vec2(0.,0.);
+		viscosity_coef = 0.1;
 	}
 
 }
