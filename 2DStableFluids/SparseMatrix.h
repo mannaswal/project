@@ -151,8 +151,9 @@ public:
 			leftElem = theElem;
 		}
 
-		if (theElem->j != j)
+		if (theElem == NULL || theElem->j != j)
 			return -1;
+
 		for(theElem = colList[j]; theElem != NULL; theElem = theElem->colNext)
 		{
 			if(theElem->i == i)
@@ -162,8 +163,10 @@ public:
 			}
 			aboveElem = theElem;
 		}
-		if (theElem->i != i)
-			return -1;
+		// Add check: Ensure the element was found in the column list before proceeding
+		if (theElem == NULL || theElem->i != i)
+				return -1;
+
 		if (leftElem == NULL) // Means A(i,j) is the first entry of a row
 		{
 			rowList[i] = rightElem;
