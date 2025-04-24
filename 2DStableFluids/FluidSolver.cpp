@@ -4,7 +4,7 @@
 //Loosely following Jos Stam's Stable Fluids
 
 CFluidSolver::CFluidSolver(void):
-n(60), size(n*n), h(0.1), laplacian(size,size), diffusion(size,size), velocity_diffusion(size, size)
+n(60), size(60*60), h(0.1), laplacian(size,size), diffusion(size,size), velocity_diffusion(size, size)
 {
 	//default size is set to 60^2
 	velocity = new vec2[size];
@@ -293,6 +293,7 @@ void CFluidSolver::velocity_advection()
 	}
 }
 
+// Define as a member function of CFluidSolver
 void CFluidSolver::setup_velocity_diffusion_matrix(double viscosity)
 {
     // Clear the matrix and reset dimensions (needed to clear internal solver arrays too)
