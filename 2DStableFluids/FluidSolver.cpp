@@ -238,10 +238,16 @@ void CFluidSolver::velocity_advection()
 			vec2 v10 = velocity[i0 + 1 + j0 * n];
 			vec2 v11 = velocity[i0 + 1 + (j0 + 1) * n];
 
-			advected_velocity[i + j * n] = (1 - s) * (1 - t) * v00 +
-										   (1 - s) * t * v01 +
-										   s * (1 - t) * v10 +
-										   s * t * v11;
+			// Compute each term separately to avoid chained expressions
+			vec2 term1 = v00 * ((1 - s) * (1 - t));
+			vec2 term2 = v01 * ((1 - s) * t);
+			vec2 term3 = v10 * (s * (1 - t));
+			vec2 term4 = v11 * (s * t);
+			vec2 result = term1 + term2;
+			result = result + term3;
+			result = result + term4;
+
+			advected_velocity[i + j * n] = result;
 		}
 	}
 }
