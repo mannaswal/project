@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "2DStableFluids.h"
 #include "ChildView.h"
-#include <string> // Include for std::to_wstring
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -147,7 +146,7 @@ void CChildView::OnPaint()
     MemBitmap1.CreateCompatibleBitmap(&dc,TextWidth,TextHeight);
     CBitmap *pOldBit1=MemDC1.SelectObject(&MemBitmap1);
 	//Background color for text
-	MemDC1.FillSolidRect(0, 0, TextWidth, TextHeight, RGB(0,20,20));
+	MemDC1.FillSolidRect(windowSize+1, 0, TextWidth, TextHeight, RGB(0,20,20));
   
 	MemDC1.SetTextColor(RGB(0,255,255));
 	CString s1,s2;
@@ -156,16 +155,18 @@ void CChildView::OnPaint()
 	s2 = s1+s2;
 	MemDC1.TextOutW(3,10,s2);
 
-	s1 = "Viscosity = ";
-	s2.Format(_T("%.3f"), fluidSolver.viscosity);
-	s2 = s1 + s2;
-	MemDC1.TextOutW(3, 30, s2);
+    // Display Viscosity
+    s1 = "Viscosity = ";
+    s2.Format(_T("%.4f"), fluidSolver.viscosity_coef);
+    s2 = s1 + s2;
+    MemDC1.TextOutW(3, 30, s2);
+
 
 	MemDC1.SetTextColor(RGB(255,255,255));
-	int row = 55;
+	int row = 55; // Adjusted starting row for guide text
 	MemDC1.TextOutW(3,row,_T("User Interface Guide:"));
 	row += 20;
-	MemDC1.TextOutW(8,row,_T("Z : Start/Stop Animation"));
+	MemDC1.TextOutW(8,row,_T("Z : Start Animation"));
 	row += 20;
 	MemDC1.TextOutW(8,row,_T("Left button: inject smoke"));
 	row += 20;
@@ -179,13 +180,10 @@ void CChildView::OnPaint()
 	row += 20;
 	MemDC1.TextOutW(8,row,_T("G : Show/Hide Gridlines"));
 	row += 20;
-	MemDC1.TextOutW(8,row,_T("A : One time step"));
-	row += 20;
-	MemDC1.TextOutW(8, row, _T("+/= : Increase Viscosity"));
-	row += 20;
-	MemDC1.TextOutW(8, row, _T("-   : Decrease Viscosity"));
+	MemDC1.TextOutW(8,row,_T("A : One more time step"));
 
-	dc.BitBlt(windowSize+1,0,TextWidth,TextHeight,&MemDC1,0,0,SRCCOPY);
+
+	dc.BitBlt(windowSize+1,0,TextWidth,TextHeight,&MemDC1,0,0,NOTSRCCOPY);
     MemBitmap1.DeleteObject();
     MemDC1.DeleteDC();
 
@@ -244,14 +242,10 @@ void CChildView::OnMouseMove(UINT nFlags, CPoint point)
 		current_point = point;
 	}
 
-	if (leftButton) {
-		int index = Find_Cell_Index(current_point);
-		fluidSolver.density_source[index] = 50. * fluidSolver.h;
-	}
-
 	if (rightButton) {
-		int index = Find_Cell_Index(current_point);
-		fluidSolver.velocity_source[index] = vec2(current_point.x-old_point.x,current_point.y-old_point.y)* 2.0;
+		int index = Find_Cell_Index(old_point);
+		//Modify velocity
+		fluidSolver.velocity_source[index] = vec2(current_point.x-old_point.x,current_point.y-old_point.y)*50.;
 	}
 
 	CWnd::OnMouseMove(nFlags, point);
@@ -260,14 +254,12 @@ void CChildView::OnMouseMove(UINT nFlags, CPoint point)
 
 void CChildView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
-	double viscosity_change = 0.01;
 
 	switch( nChar)
 	{
 	case 'a':
 	case 'A':
 		fluidSolver.update();
-		Invalidate(false);
 		break;
 	case 'Z':
 	case 'z':
@@ -295,28 +287,24 @@ void CChildView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 		showVelocity = !showVelocity;
 		Invalidate(false);
 		break;
-	case 'G':
+	case 'G': // Show/Hide the grid
 	case 'g':
 		showGrid = !showGrid;
 		InvalidateRect(NULL,FALSE);
 		break;
-	case VK_OEM_PLUS:
-	case VK_ADD:
-	case '=':
-		fluidSolver.viscosity += viscosity_change;
-		fluidSolver.update_velocity_diffusion_matrix();
-		Invalidate(false);
-		break;
-	case VK_OEM_MINUS:
-	case VK_SUBTRACT:
-	case '-':
-		fluidSolver.viscosity -= viscosity_change;
-		if (fluidSolver.viscosity < 0) {
-			fluidSolver.viscosity = 0;
-		}
-		fluidSolver.update_velocity_diffusion_matrix();
-		Invalidate(false);
-		break;
+    case VK_OEM_PLUS: // Increase viscosity (+/= key)
+        fluidSolver.viscosity_coef *= 1.2; // Increase by 20%
+        fluidSolver.setup_velocity_diffusion_matrix(fluidSolver.viscosity_coef);
+        Invalidate(false); // Redraw to show new viscosity value
+        break;
+    case VK_OEM_MINUS: // Decrease viscosity (-/_ key)
+        fluidSolver.viscosity_coef /= 1.2; // Decrease by factor
+        if (fluidSolver.viscosity_coef < 1e-6) { // Clamp minimum value
+            fluidSolver.viscosity_coef = 0; // Set to zero if very small
+        }
+        fluidSolver.setup_velocity_diffusion_matrix(fluidSolver.viscosity_coef);
+        Invalidate(false); // Redraw to show new viscosity value
+        break;
 	}
 
 	CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
@@ -327,23 +315,17 @@ int CChildView::Find_Cell_Index(CPoint point)
 	int x = point.x;
 	int y = point.y;
 	// set boundaries for mouse input to be inside the rectangular
-	if (x >= windowSize - 1)
-		x = windowSize - 2;
+	if (x >= windowSize)
+		x = windowSize - 1;
 	if (x < 0)
 		x = 0;
-	if (y >= windowSize - 1)
-		y = windowSize - 2;
+	if (y >= windowSize)
+		y = windowSize - 1;
 	if (y < 0)
 		y = 0;
-	// find the cell index of mouse input
+	// finwindowSize the cell inwindowSizeex of mouse input
 	int cell_i = x / dx;
 	int cell_j = y / dx;
-
-	// Clamp indices just in case
-	if (cell_i >= fluidSolver.n) cell_i = fluidSolver.n - 1;
-	if (cell_i < 0) cell_i = 0;
-	if (cell_j >= fluidSolver.n) cell_j = fluidSolver.n - 1;
-	if (cell_j < 0) cell_j = 0;
 
 	return cell_i + fluidSolver.n * cell_j;
 }

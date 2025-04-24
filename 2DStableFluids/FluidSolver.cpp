@@ -4,7 +4,7 @@
 //Loosely following Jos Stam's Stable Fluids
 
 CFluidSolver::CFluidSolver(void):
-n(60), size(n*n), h(0.1), viscosity(0.1), laplacian(size,size), diffusion(size,size), velocity_diffusion_matrix(size,size)
+n(60), size(n*n), h(0.1), laplacian(size,size), diffusion(size,size), velocity_diffusion(size, size)
 {
 	//default size is set to 60^2
 	velocity = new vec2[size];
@@ -14,15 +14,13 @@ n(60), size(n*n), h(0.1), viscosity(0.1), laplacian(size,size), diffusion(size,s
 	density_source = new double[size];
 	pressure = new double[size];
 	divergence = new double[size];
+    temp_x = new double[size]; // Allocate temp array for x-velocity
+    temp_y = new double[size]; // Allocate temp array for y-velocity
 
-	// Allocate temp arrays for velocity diffusion
-	vel_x = new double[size];
-	vel_y = new double[size];
-	new_vel_x = new double[size];
-	new_vel_y = new double[size];
+	double diffusion_coef = 0.3*h;
+    viscosity_coef = 0.1; // Default viscosity
 
-	double density_diffusion_coef = 0.3*h; // Renamed for clarity
-	//Set up the Laplacian matrix and density diffusion matrix
+	//Set up the Laplacian matrix and diffusion matrix
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			int index = i + j*n;
@@ -45,27 +43,26 @@ n(60), size(n*n), h(0.1), viscosity(0.1), laplacian(size,size), diffusion(size,s
 			}
 			int count = 0;
 			if (i-1>0) {
-				diffusion.set1Value(index, index-1, -1.0*density_diffusion_coef);
+				diffusion.set1Value(index, index-1, -1.0*diffusion_coef);
 				count++;
 			}
 			if (i+1<n-1) {
-				diffusion.set1Value(index, index+1, -1.0*density_diffusion_coef);
+				diffusion.set1Value(index, index+1, -1.0*diffusion_coef);
 				count++;
 			}
 			if (j-1>0) {
-				diffusion.set1Value(index, index-n, -1.0*density_diffusion_coef);
+				diffusion.set1Value(index, index-n, -1.0*diffusion_coef);
 				count++;
 			}
 			if (j+1<n-1) {
-				diffusion.set1Value(index, index+n, -1.0*density_diffusion_coef);
+				diffusion.set1Value(index, index+n, -1.0*diffusion_coef);
 				count++;
 			}
-			diffusion.set1Value(index, index, 1.+count*density_diffusion_coef);
+			diffusion.set1Value(index, index, 1.+count*diffusion_coef);
 		}
 	}
 
-	update_velocity_diffusion_matrix(); // Build initial velocity diffusion matrix
-
+    setup_velocity_diffusion_matrix(viscosity_coef); // Build initial velocity diffusion matrix
 	reset();
 }
 
@@ -92,12 +89,9 @@ CFluidSolver::~CFluidSolver(void)
 	delete[] density_source;
 	delete[] velocity_source;
 	delete[] advected_velocity;
-
-	// Delete temp arrays
-	delete[] vel_x;
-	delete[] vel_y;
-	delete[] new_vel_x;
-	delete[] new_vel_y;
+    delete[] temp_x; // Deallocate temp array for x-velocity
+    delete[] temp_y; // Deallocate temp array for y-velocity
+    // velocity_diffusion is cleaned up by its destructor
 }
 
 void CFluidSolver::update()
@@ -135,7 +129,25 @@ void CFluidSolver::updateVelocity()
 		}
 	}
 
-	velocity_diffusion(); // Add velocity diffusion step
+    // Velocity Diffusion step
+    if (viscosity_coef > 0) { // Only solve if viscosity is positive
+        // Extract components
+        for (int k = 0; k < size; k++) {
+            temp_x[k] = velocity[k].x;
+            temp_y[k] = velocity[k].y;
+        }
+
+        // Solve diffusion implicitly for each component
+        // solve(x, b, tol, iter_max) solves Ax=b, modifying x in-place
+        velocity_diffusion.solve(temp_x, temp_x, 1e-8, 30);
+        velocity_diffusion.solve(temp_y, temp_y, 1e-8, 30);
+
+        // Combine components back
+        for (int k = 0; k < size; k++) {
+            velocity[k].x = temp_x[k];
+            velocity[k].y = temp_y[k];
+        }
+    }
 
 	projection();
 	clean_velocity_source();
@@ -281,62 +293,48 @@ void CFluidSolver::velocity_advection()
 	}
 }
 
-// Function to build/rebuild the velocity diffusion matrix based on current viscosity
-void CFluidSolver::update_velocity_diffusion_matrix()
+void CFluidSolver::setup_velocity_diffusion_matrix(double viscosity)
 {
-	double velocity_diffusion_coef = viscosity * h;
-	velocity_diffusion_matrix.setup_coefficient_matrix(); // Clear existing matrix data if necessary (assuming this method exists)
+    // Clear the matrix and reset dimensions (needed to clear internal solver arrays too)
+    velocity_diffusion.Cleanup();
+    velocity_diffusion.setDimensions(size); // Resets rowList, colList, diagonal, and solver arrays (dr, dp, etc.)
 
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < n; j++) {
-			int index = i + j * n;
-			int count = 0;
-			if (i > 0 && i < n - 1 && j > 0 && j < n - 1) { // Only diffuse interior points implicitly? Check Stam's method / boundary conditions. Let's assume implicit on interior, explicit/no-op on boundary for now.
-				if (i - 1 > 0) {
-					velocity_diffusion_matrix.set1Value(index, index - 1, -1.0 * velocity_diffusion_coef);
-					count++;
-				}
-				if (i + 1 < n - 1) {
-					velocity_diffusion_matrix.set1Value(index, index + 1, -1.0 * velocity_diffusion_coef);
-					count++;
-				}
-				if (j - 1 > 0) {
-					velocity_diffusion_matrix.set1Value(index, index - n, -1.0 * velocity_diffusion_coef);
-					count++;
-				}
-				if (j + 1 < n - 1) {
-					velocity_diffusion_matrix.set1Value(index, index + n, -1.0 * velocity_diffusion_coef);
-					count++;
-				}
-				velocity_diffusion_matrix.set1Value(index, index, 1. + count * velocity_diffusion_coef);
-			} else {
-				// Boundary cells: Use identity matrix for simplicity (no diffusion from boundary)
-				// Alternatively, different boundary conditions could be applied here.
-				velocity_diffusion_matrix.set1Value(index, index, 1.0);
-			}
-		}
-	}
-}
+    double coef = viscosity * h;
+    if (coef <= 0) { // If viscosity is non-positive, just set identity matrix
+        for (int i = 0; i < size; i++) {
+            velocity_diffusion.set1Value(i, i, 1.0);
+        }
+        return;
+    }
 
-// Function to perform velocity diffusion using the solver
-void CFluidSolver::velocity_diffusion()
-{
-	// 1. Copy velocity components to temporary flat arrays
-	for (int i = 0; i < size; ++i) {
-		vel_x[i] = velocity[i].x;
-		vel_y[i] = velocity[i].y;
-	}
-
-	// 2. Solve diffusion equation for each component
-	// Solve: (I + viscosity*h*Laplacian) * new_vel = old_vel
-	double tolerance = 1e-8;
-	int max_iterations = 30;
-	velocity_diffusion_matrix.solve(new_vel_x, vel_x, tolerance, max_iterations);
-	velocity_diffusion_matrix.solve(new_vel_y, vel_y, tolerance, max_iterations);
-
-	// 3. Copy results back to the velocity array
-	for (int i = 0; i < size; ++i) {
-		velocity[i].x = new_vel_x[i];
-		velocity[i].y = new_vel_y[i];
-	}
+    // Build the matrix (I + coef * Laplacian_like_op)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            int index = i + j * n;
+            int count = 0;
+            // Check neighbors within the internal grid (1 to n-2)
+            if (i > 0 && i < n - 1 && j > 0 && j < n - 1) {
+                if (i - 1 > 0) {
+                    velocity_diffusion.set1Value(index, index - 1, -coef);
+                    count++;
+                }
+                if (i + 1 < n - 1) {
+                    velocity_diffusion.set1Value(index, index + 1, -coef);
+                    count++;
+                }
+                if (j - 1 > 0) {
+                    velocity_diffusion.set1Value(index, index - n, -coef);
+                    count++;
+                }
+                if (j + 1 < n - 1) {
+                    velocity_diffusion.set1Value(index, index + n, -coef);
+                    count++;
+                }
+                velocity_diffusion.set1Value(index, index, 1.0 + count * coef);
+            } else {
+                // Boundary cells: treat as just Identity for the implicit solve
+                velocity_diffusion.set1Value(index, index, 1.0);
+            }
+        }
+    }
 }

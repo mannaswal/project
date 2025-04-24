@@ -18,7 +18,6 @@ public:
 	int		n;		// number of grid points along one side of the square domain
 	int		size;	// = n * n
 	double	h;		// time step
-	double  viscosity; // Viscosity coefficient
 
 	double*	density;
 	vec2*	velocity;
@@ -28,29 +27,26 @@ public:
 	double* density_source;
 	vec2*	velocity_source;
 	vec2*	advected_velocity; //temp variable
-
-	// Temporary arrays for velocity diffusion components
-	double* vel_x;
-	double* vel_y;
-	double* new_vel_x;
-	double* new_vel_y;
 	
 	CSparseMatrix laplacian;
-	CSparseMatrix diffusion; // For density
-	CSparseMatrix velocity_diffusion_matrix; // For velocity
+	CSparseMatrix diffusion;
+	CSparseMatrix velocity_diffusion; // Matrix for velocity diffusion
+
+	double viscosity_coef; // Viscosity coefficient
+	double* temp_x;         // Temporary array for x-velocity component
+	double* temp_y;         // Temporary array for y-velocity component
 
 public:
 	void reset();
 	void update();
 	void updateVelocity();
 	void updateDensity();
+	void setup_velocity_diffusion_matrix(double viscosity); // Function to build the velocity diffusion matrix
 	void clean_density_source();
 	void clean_velocity_source();
 	void projection();
 	void density_advection();
 	void velocity_advection();
-	void velocity_diffusion();
-	void update_velocity_diffusion_matrix();
 
 	vec2* v(int i, int j) {return velocity+i+j*n;};
 	double* d(int i, int j) {return density+i+j*n;};
