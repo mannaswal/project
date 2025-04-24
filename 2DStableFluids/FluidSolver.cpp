@@ -297,7 +297,6 @@ void CFluidSolver::velocity_advection()
 void CFluidSolver::setup_velocity_diffusion_matrix(double viscosity)
 {
     // Clear the matrix and reset dimensions (needed to clear internal solver arrays too)
-    velocity_diffusion.Cleanup();
     velocity_diffusion.setDimensions(size); // Resets rowList, colList, diagonal, and solver arrays (dr, dp, etc.)
 
     double coef = viscosity * h;
