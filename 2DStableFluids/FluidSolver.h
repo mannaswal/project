@@ -28,10 +28,16 @@ public:
 	double* density_source;
 	vec2*	velocity_source;
 	vec2*	advected_velocity; //temp variable
+
+	// Temporary arrays for velocity diffusion components
+	double* vel_x;
+	double* vel_y;
+	double* new_vel_x;
+	double* new_vel_y;
 	
 	CSparseMatrix laplacian;
-	CSparseMatrix diffusion;
-	CSparseMatrix velocity_diffusion_matrix; // For velocity diffusion
+	CSparseMatrix diffusion; // For density
+	CSparseMatrix velocity_diffusion_matrix; // For velocity
 
 public:
 	void reset();
@@ -43,10 +49,8 @@ public:
 	void projection();
 	void density_advection();
 	void velocity_advection();
-
-	// Methods to adjust viscosity
-	void increaseViscosity(double factor = 1.1);
-	void decreaseViscosity(double factor = 1.1);
+	void velocity_diffusion();
+	void update_velocity_diffusion_matrix();
 
 	vec2* v(int i, int j) {return velocity+i+j*n;};
 	double* d(int i, int j) {return density+i+j*n;};
@@ -67,8 +71,5 @@ public:
 
 	CFluidSolver(void);
 	~CFluidSolver(void);
-
-private:
-	void updateVelocityDiffusionMatrix(); // Helper to rebuild matrix when viscosity changes
 };
 
