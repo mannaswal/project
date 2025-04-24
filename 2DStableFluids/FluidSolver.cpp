@@ -106,9 +106,22 @@ void CFluidSolver::updateDensity()
 void CFluidSolver::updateVelocity()
 {
 	velocity_advection();
-	add(velocity,advected_velocity,velocity_source);
+	add(velocity, advected_velocity, velocity_source);
 
-	projection(); 
+	// Add buoyancy force (proportional to density, acts upwards)
+	double buoyancy_coef = 0.1; // Adjust as needed
+	for (int i = 1; i < n - 1; i++) {
+		for (int j = 1; j < n - 1; j++) {
+			int index = i + j * n;
+			if (density[index] > 0) { // Apply force only where there's density
+				// Assuming y increases downwards, negative y is upwards
+				vec2 buoyancy_force = vec2(0.0, -buoyancy_coef * density[index]);
+				velocity[index] = velocity[index] + buoyancy_force; // Add force to velocity
+			}
+		}
+	}
+
+	projection();
 	clean_velocity_source();
 }
 
