@@ -306,7 +306,10 @@ void CFluidSolver::velocity_advection()
 
 void CFluidSolver::updateVelocityDiffusionMatrix()
 {
-	velocity_diffusion_matrix.setZero(); // Clear existing matrix data
+	//velocity_diffusion_matrix.setZero(); // Incorrect: setZero does not exist
+	velocity_diffusion_matrix.Cleanup(); // Clear existing elements and internal arrays
+	velocity_diffusion_matrix.setDimensions(size, size); // Reallocate arrays
+
 	double diffusion_coef = viscosity * h;
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
