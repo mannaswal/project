@@ -18,6 +18,7 @@ public:
 	int		n;		// number of grid points along one side of the square domain
 	int		size;	// = n * n
 	double	h;		// time step
+	double  viscosity; // Viscosity coefficient
 
 	double*	density;
 	vec2*	velocity;
@@ -30,6 +31,7 @@ public:
 	
 	CSparseMatrix laplacian;
 	CSparseMatrix diffusion;
+	CSparseMatrix velocity_diffusion_matrix; // For velocity diffusion
 
 public:
 	void reset();
@@ -41,6 +43,10 @@ public:
 	void projection();
 	void density_advection();
 	void velocity_advection();
+
+	// Methods to adjust viscosity
+	void increaseViscosity(double factor = 1.1);
+	void decreaseViscosity(double factor = 1.1);
 
 	vec2* v(int i, int j) {return velocity+i+j*n;};
 	double* d(int i, int j) {return density+i+j*n;};
@@ -61,5 +67,8 @@ public:
 
 	CFluidSolver(void);
 	~CFluidSolver(void);
+
+private:
+	void updateVelocityDiffusionMatrix(); // Helper to rebuild matrix when viscosity changes
 };
 

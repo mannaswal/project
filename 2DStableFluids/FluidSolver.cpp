@@ -4,7 +4,9 @@
 //Loosely following Jos Stam's Stable Fluids
 
 CFluidSolver::CFluidSolver(void):
-n(60), size(n*n), h(0.1), laplacian(size,size), diffusion(size,size)
+n(60), size(n*n), h(0.1), viscosity(0.1), // Initialize viscosity
+laplacian(size,size), diffusion(size,size),
+velocity_diffusion_matrix(size,size) // Initialize velocity diffusion matrix size
 {
 	//default size is set to 60^2
 	velocity = new vec2[size];
@@ -57,6 +59,9 @@ n(60), size(n*n), h(0.1), laplacian(size,size), diffusion(size,size)
 			diffusion.set1Value(index, index, 1.+count*diffusion_coef);
 		}
 	}
+
+	// Initialize the velocity diffusion matrix
+	updateVelocityDiffusionMatrix();
 
 	reset();
 }
@@ -121,7 +126,41 @@ void CFluidSolver::updateVelocity()
 		}
 	}
 
-	projection();
+	// Add Velocity Diffusion (Viscosity)
+	if (viscosity > 1e-6) { // Only diffuse if viscosity is significant
+		// Allocate temporary arrays for x and y components
+		double* vel_x_old = new double[size];
+		double* vel_y_old = new double[size];
+		double* vel_x_new = new double[size];
+		double* vel_y_new = new double[size];
+
+		// Split current velocity into x and y components
+		for(int i = 0; i < size; ++i) {
+			vel_x_old[i] = velocity[i].x;
+			vel_y_old[i] = velocity[i].y;
+		}
+
+		// Solve diffusion equation for x and y components separately
+		// (I - viscosity * h * Laplacian) * vel_new = vel_old
+		double tolerance = 1e-8;
+		int max_iterations = 30;
+		velocity_diffusion_matrix.solve(vel_x_new, vel_x_old, tolerance, max_iterations);
+		velocity_diffusion_matrix.solve(vel_y_new, vel_y_old, tolerance, max_iterations);
+
+		// Combine solved components back into the velocity array
+		for(int i = 0; i < size; ++i) {
+			velocity[i].x = vel_x_new[i];
+			velocity[i].y = vel_y_new[i];
+		}
+
+		// Clean up temporary arrays
+		delete[] vel_x_old;
+		delete[] vel_y_old;
+		delete[] vel_x_new;
+		delete[] vel_y_new;
+	}
+
+	projection(); 
 	clean_velocity_source();
 }
 
@@ -263,4 +302,52 @@ void CFluidSolver::velocity_advection()
 			advected_velocity[i + j * n] = result;
 		}
 	}
+}
+
+void CFluidSolver::updateVelocityDiffusionMatrix()
+{
+	velocity_diffusion_matrix.setZero(); // Clear existing matrix data
+	double diffusion_coef = viscosity * h;
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			int index = i + j * n;
+			int count = 0;
+			if (i > 0) {
+				velocity_diffusion_matrix.set1Value(index, index - 1, -1.0 * diffusion_coef);
+				count++;
+			}
+			if (i < n - 1) {
+				velocity_diffusion_matrix.set1Value(index, index + 1, -1.0 * diffusion_coef);
+				count++;
+			}
+			if (j > 0) {
+				velocity_diffusion_matrix.set1Value(index, index - n, -1.0 * diffusion_coef);
+				count++;
+			}
+			if (j < n - 1) {
+				velocity_diffusion_matrix.set1Value(index, index + n, -1.0 * diffusion_coef);
+				count++;
+			}
+			// Handle boundary conditions implicitly by adjusting diagonal
+            // Interior points: (1 + neighbors * diffusion_coef)
+            // Boundary points: (1 + neighbors * diffusion_coef) - may differ slightly but ok for implicit solve
+            velocity_diffusion_matrix.set1Value(index, index, 1.0 + count * diffusion_coef);
+		}
+	}
+}
+
+void CFluidSolver::increaseViscosity(double factor)
+{
+	viscosity *= factor;
+	if (viscosity > 10.0) viscosity = 10.0; // Add an upper limit if desired
+	updateVelocityDiffusionMatrix();
+	printf("Viscosity increased to: %f\n", viscosity); // Debug output
+}
+
+void CFluidSolver::decreaseViscosity(double factor)
+{
+	viscosity /= factor;
+	if (viscosity < 1e-6) viscosity = 1e-6; // Prevent viscosity from becoming too small or zero
+	updateVelocityDiffusionMatrix();
+	printf("Viscosity decreased to: %f\n", viscosity); // Debug output
 }

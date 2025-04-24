@@ -1,10 +1,12 @@
-
 // ChildView.cpp : implementation of the CChildView class
 //
 
 #include "stdafx.h"
 #include "2DStableFluids.h"
 #include "ChildView.h"
+#include <string>
+#include <iomanip> // for setprecision
+#include <sstream> // for ostringstream
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -175,7 +177,17 @@ void CChildView::OnPaint()
 	MemDC1.TextOutW(8,row,_T("G : Show/Hide Gridlines"));
 	row += 20;
 	MemDC1.TextOutW(8,row,_T("A : One more time step"));
+	row += 20;
+	MemDC1.TextOutW(8,row,_T("+/= : Increase Viscosity"));
+	row += 20;
+	MemDC1.TextOutW(8,row,_T("-/_ : Decrease Viscosity"));
 
+	// Display current viscosity
+	std::wostringstream wss;
+    wss << L"Viscosity: " << std::fixed << std::setprecision(4) << fluidSolver.viscosity;
+    std::wstring ws = wss.str();
+    CString viscosity_text(ws.c_str());
+	MemDC1.TextOutW(3, row, viscosity_text);
 
 	dc.BitBlt(windowSize+1,0,TextWidth,TextHeight,&MemDC1,0,0,NOTSRCCOPY);
     MemBitmap1.DeleteObject();
@@ -286,6 +298,19 @@ void CChildView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 		showGrid = !showGrid;
 		InvalidateRect(NULL,FALSE);
 		break;
+	// Handle viscosity changes
+    case VK_OEM_PLUS:
+    case VK_OEM_MINUS:
+    case '=': // Often same key as plus
+    case '-': // Often same key as minus
+        if (nChar == VK_OEM_PLUS || nChar == '=') {
+            fluidSolver.increaseViscosity();
+        }
+        else if (nChar == VK_OEM_MINUS || nChar == '-') {
+            fluidSolver.decreaseViscosity();
+        }
+        Invalidate(false); // Redraw to show updated viscosity value
+        break;
 	}
 
 	CWnd::OnKeyDown(nChar, nRepCnt, nFlags);
