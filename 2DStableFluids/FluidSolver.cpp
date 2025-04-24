@@ -14,8 +14,8 @@ n(60), size(60*60), h(0.1), laplacian(size,size), diffusion(size,size), velocity
 	density_source = new double[size];
 	pressure = new double[size];
 	divergence = new double[size];
-    temp_x = new double[size]; // Allocate temp array for x-velocity
-    temp_y = new double[size]; // Allocate temp array for y-velocity
+	temp_x = new double[size]; // Allocate temp array for x-velocity
+	temp_y = new double[size]; // Allocate temp array for y-velocity
 
 	double diffusion_coef = 0.3*h;
 	viscosity_coef = 0.1; // Default viscosity
@@ -90,9 +90,9 @@ CFluidSolver::~CFluidSolver(void)
 	delete[] density_source;
 	delete[] velocity_source;
 	delete[] advected_velocity;
-    delete[] temp_x; // Deallocate temp array for x-velocity
-    delete[] temp_y; // Deallocate temp array for y-velocity
-    // velocity_diffusion is cleaned up by its destructor
+	delete[] temp_x; // Deallocate temp array for x-velocity
+	delete[] temp_y; // Deallocate temp array for y-velocity
+	// velocity_diffusion is cleaned up by its destructor
 }
 
 void CFluidSolver::update()
@@ -118,14 +118,13 @@ void CFluidSolver::updateVelocity()
 	add(velocity, advected_velocity, velocity_source);
 
 	// Add buoyancy force (proportional to density, acts upwards)
-	double buoyancy_coef = 0.1; // Adjust as needed
+	double buoyancy_coef = 0.1;
 	for (int i = 1; i < n - 1; i++) {
 		for (int j = 1; j < n - 1; j++) {
 			int index = i + j * n;
 			if (density[index] > 0) { // Apply force only where there's density
-				// Assuming y increases downwards, negative y is upwards
 				vec2 buoyancy_force = vec2(0.0, -buoyancy_coef * density[index]);
-				velocity[index] = velocity[index] + buoyancy_force; // Add force to velocity
+				velocity[index] = velocity[index] + buoyancy_force; 
 			}
 		}
 	}
@@ -139,7 +138,6 @@ void CFluidSolver::updateVelocity()
         }
 
         // Solve diffusion implicitly for each component
-        // solve(x, b, tol, iter_max) solves Ax=b, modifying x in-place
         velocity_diffusion.solve(temp_x, temp_x, 1e-8, 30);
         velocity_diffusion.solve(temp_y, temp_y, 1e-8, 30);
 
@@ -294,11 +292,10 @@ void CFluidSolver::velocity_advection()
 	}
 }
 
-// Define as a member function of CFluidSolver
+
 void CFluidSolver::setup_velocity_diffusion_matrix(double viscosity)
 {
-    // Clear the matrix and reset dimensions (needed to clear internal solver arrays too)
-    velocity_diffusion.setDimensions(size); // Resets rowList, colList, diagonal, and solver arrays (dr, dp, etc.)
+    velocity_diffusion.setDimensions(size); // Resets rowList, colList, diagonal, and solver arrays
 
     double coef = viscosity * h;
     if (coef <= 0) { // If viscosity is non-positive, just set identity matrix
