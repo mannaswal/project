@@ -204,8 +204,44 @@ void CFluidSolver::density_advection()
 
 void CFluidSolver::velocity_advection()
 {
-	for (int i = 1; i < n - 1; i++)
+	//set boundary condition
+	for (int i = 0; i < n; i++) {
+		advected_velocity[0 + i * n] = vec2(0., 0.);
+		advected_velocity[(n - 1) + i * n] = vec2(0., 0.);
+		advected_velocity[i + 0 * n] = vec2(0., 0.);
+		advected_velocity[i + (n - 1) * n] = vec2(0., 0.);
+	}
+
+	vec2 backtraced_position;
+	for (int i = 1; i < n - 1; i++) {
 		for (int j = 1; j < n - 1; j++) {
-			advected_velocity[i + j * n] = velocity[i + j * n];
+			// Backtrace
+			backtraced_position = vec2(i, j) + velocity[i + j * n] * (-h);
+			// Clamp to valid range
+			if (backtraced_position.x < 0.5)
+				backtraced_position.x = 0.5;
+			if (backtraced_position.x > n - 1.5)
+				backtraced_position.x = n - 1.5;
+			if (backtraced_position.y < 0.5)
+				backtraced_position.y = 0.5;
+			if (backtraced_position.y > n - 1.5)
+				backtraced_position.y = n - 1.5;
+
+			// Bilinear interpolation
+			int i0 = (int)backtraced_position.x;
+			int j0 = (int)backtraced_position.y;
+			double s = backtraced_position.x - i0;
+			double t = backtraced_position.y - j0;
+
+			vec2 v00 = velocity[i0 + j0 * n];
+			vec2 v01 = velocity[i0 + (j0 + 1) * n];
+			vec2 v10 = velocity[i0 + 1 + j0 * n];
+			vec2 v11 = velocity[i0 + 1 + (j0 + 1) * n];
+
+			advected_velocity[i + j * n] = (1 - s) * (1 - t) * v00 +
+										   (1 - s) * t * v01 +
+										   s * (1 - t) * v10 +
+										   s * t * v11;
 		}
+	}
 }
